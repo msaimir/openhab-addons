@@ -12,12 +12,30 @@
  */
 package org.openhab.binding.enphase.internal.handler;
 
-import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.CONFIG_HOSTNAME;
-import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.ENVOY_CHANNELGROUP_CONSUMPTION;
-import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.ENVOY_WATTS_NOW;
-import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.ENVOY_WATT_HOURS_LIFETIME;
-import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.ENVOY_WATT_HOURS_SEVEN_DAYS;
-import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.ENVOY_WATT_HOURS_TODAY;
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+import org.eclipse.jetty.client.HttpClient;
+import org.openhab.binding.enphase.internal.*;
+import org.openhab.binding.enphase.internal.discovery.EnphaseDevicesDiscoveryService;
+import org.openhab.binding.enphase.internal.dto.EnvoyEnergyDTO;
+import org.openhab.binding.enphase.internal.dto.InventoryJsonDTO.DeviceDTO;
+import org.openhab.binding.enphase.internal.dto.InverterDTO;
+import org.openhab.core.cache.ExpiringCache;
+import org.openhab.core.config.core.Configuration;
+import org.openhab.core.io.net.http.TlsTrustManagerProvider;
+import org.openhab.core.library.types.QuantityType;
+import org.openhab.core.library.unit.Units;
+import org.openhab.core.thing.*;
+import org.openhab.core.thing.binding.BaseBridgeHandler;
+import org.openhab.core.thing.binding.ThingHandler;
+import org.openhab.core.thing.binding.ThingHandlerService;
+import org.openhab.core.types.Command;
+import org.openhab.core.types.RefreshType;
+import org.openhab.core.types.UnDefType;
+import org.osgi.framework.FrameworkUtil;
+import org.osgi.framework.ServiceRegistration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -30,36 +48,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.jetty.client.HttpClient;
-import org.openhab.binding.enphase.internal.EnphaseBindingConstants;
-import org.openhab.binding.enphase.internal.EnvoyConfiguration;
-import org.openhab.binding.enphase.internal.EnvoyConnectionException;
-import org.openhab.binding.enphase.internal.EnvoyHostAddressCache;
-import org.openhab.binding.enphase.internal.EnvoyNoHostnameException;
-import org.openhab.binding.enphase.internal.discovery.EnphaseDevicesDiscoveryService;
-import org.openhab.binding.enphase.internal.dto.EnvoyEnergyDTO;
-import org.openhab.binding.enphase.internal.dto.InventoryJsonDTO.DeviceDTO;
-import org.openhab.binding.enphase.internal.dto.InverterDTO;
-import org.openhab.core.cache.ExpiringCache;
-import org.openhab.core.config.core.Configuration;
-import org.openhab.core.library.types.QuantityType;
-import org.openhab.core.library.unit.Units;
-import org.openhab.core.thing.Bridge;
-import org.openhab.core.thing.Channel;
-import org.openhab.core.thing.ChannelUID;
-import org.openhab.core.thing.Thing;
-import org.openhab.core.thing.ThingStatus;
-import org.openhab.core.thing.ThingStatusDetail;
-import org.openhab.core.thing.binding.BaseBridgeHandler;
-import org.openhab.core.thing.binding.ThingHandler;
-import org.openhab.core.thing.binding.ThingHandlerService;
-import org.openhab.core.types.Command;
-import org.openhab.core.types.RefreshType;
-import org.openhab.core.types.UnDefType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.*;
 
 /**
  * BridgeHandler for the Envoy gateway.
@@ -91,6 +80,8 @@ public class EnvoyBridgeHandler extends BaseBridgeHandler {
     private @Nullable EnvoyEnergyDTO consumptionDTO;
     private FeatureStatus consumptionSupported = FeatureStatus.UNKNOWN;
     private FeatureStatus jsonSupported = FeatureStatus.UNKNOWN;
+
+    private @Nullable ServiceRegistration<?> serviceRegistration;
 
     public EnvoyBridgeHandler(final Bridge thing, final HttpClient httpClient,
             final EnvoyHostAddressCache envoyHostAddressCache) {
@@ -152,6 +143,11 @@ public class EnvoyBridgeHandler extends BaseBridgeHandler {
                 this::refreshDevices);
         updataDataFuture = scheduler.scheduleWithFixedDelay(this::updateData, 0, configuration.refresh,
                 TimeUnit.MINUTES);
+
+        logger.debug("Configuration {}", configuration);
+        EnvoyTlsTrustManagerProvider tlsTrustManagerProvider = new EnvoyTlsTrustManagerProvider(configuration.hostname);
+        serviceRegistration = FrameworkUtil.getBundle(getClass()).getBundleContext()
+                .registerService(TlsTrustManagerProvider.class.getName(), tlsTrustManagerProvider, null);
     }
 
     /**
@@ -394,6 +390,13 @@ public class EnvoyBridgeHandler extends BaseBridgeHandler {
 
         if (inverterFuture != null) {
             inverterFuture.cancel(true);
+        }
+
+        ServiceRegistration<?> localServiceRegistration = serviceRegistration;
+        if (localServiceRegistration != null) {
+            // remove trustmanager service
+            localServiceRegistration.unregister();
+            serviceRegistration = null;
         }
     }
 

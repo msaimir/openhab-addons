@@ -12,14 +12,9 @@
  */
 package org.openhab.binding.enphase.internal.handler;
 
-import java.net.URI;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
-
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSyntaxException;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
@@ -29,23 +24,24 @@ import org.eclipse.jetty.client.api.AuthenticationStore;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.util.DigestAuthentication;
+import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http.HttpStatus;
 import org.openhab.binding.enphase.internal.EnphaseBindingConstants;
 import org.openhab.binding.enphase.internal.EnvoyConfiguration;
 import org.openhab.binding.enphase.internal.EnvoyConnectionException;
 import org.openhab.binding.enphase.internal.EnvoyNoHostnameException;
-import org.openhab.binding.enphase.internal.dto.EnvoyEnergyDTO;
-import org.openhab.binding.enphase.internal.dto.EnvoyErrorDTO;
-import org.openhab.binding.enphase.internal.dto.InventoryJsonDTO;
-import org.openhab.binding.enphase.internal.dto.InverterDTO;
-import org.openhab.binding.enphase.internal.dto.ProductionJsonDTO;
+import org.openhab.binding.enphase.internal.dto.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonSyntaxException;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 /**
  * Methods to make API calls to the Envoy gateway.
@@ -55,7 +51,7 @@ import com.google.gson.JsonSyntaxException;
 @NonNullByDefault
 class EnvoyConnector {
 
-    private static final String HTTP = "http://";
+    private static final String HTTP = "https://";
     private static final String PRODUCTION_JSON_URL = "/production.json";
     private static final String INVENTORY_JSON_URL = "/inventory.json";
     private static final String PRODUCTION_URL = "/api/v1/production";
@@ -63,10 +59,15 @@ class EnvoyConnector {
     private static final String INVERTERS_URL = PRODUCTION_URL + "/inverters";
     private static final long CONNECT_TIMEOUT_SECONDS = 5;
 
+//    private static final String CHECK_JWT = "/auth/check_jwt";
+
     private final Logger logger = LoggerFactory.getLogger(EnvoyConnector.class);
     private final Gson gson = new GsonBuilder().create();
     private final HttpClient httpClient;
     private String hostname = "";
+
+    private @Nullable EnvoyConfiguration envoyConfiguration;
+
     private @Nullable DigestAuthentication envoyAuthn;
     private @Nullable URI invertersURI;
 
@@ -80,6 +81,8 @@ class EnvoyConnector {
      * @param configuration the configuration to set
      */
     public void setConfiguration(final EnvoyConfiguration configuration) {
+        logger.debug("Envoy configuration {}", configuration);
+        this.envoyConfiguration = configuration;
         hostname = configuration.hostname;
         if (hostname.isEmpty()) {
             return;
@@ -155,17 +158,27 @@ class EnvoyConnector {
     private synchronized <T> T retrieveData(final String urlPath, final Function<String, @Nullable T> jsonConverter)
             throws EnvoyConnectionException, EnvoyNoHostnameException {
         try {
+            String jwt = null;
+            if(envoyConfiguration != null) {
+                jwt = EnphaseJWTExtractor.fetchJWT(httpClient, envoyConfiguration.username, envoyConfiguration.password, envoyConfiguration.serialNumber);
+                logger.debug("jwt retrieved {}", jwt);
+            }
             if (hostname.isEmpty()) {
                 throw new EnvoyNoHostnameException("No host name/ip address known (yet)");
             }
             final URI uri = URI.create(HTTP + hostname + urlPath);
-            logger.trace("Retrieving data from '{}'", uri);
-            final Request request = httpClient.newRequest(uri).method(HttpMethod.GET).timeout(CONNECT_TIMEOUT_SECONDS,
-                    TimeUnit.SECONDS);
+            logger.debug("Retrieving data from '{}'", uri);
+            final Request request = httpClient.newRequest(uri)
+                    .method(HttpMethod.GET)
+                    .timeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if(jwt != null) {
+                request.header(HttpHeader.AUTHORIZATION, "Bearer: " + jwt);
+            }
             final ContentResponse response = request.send();
             final String content = response.getContentAsString();
 
-            logger.trace("Envoy returned data for '{}' with status {}: {}", urlPath, response.getStatus(), content);
+            logger.debug("Envoy returned data for '{}' with status {}: {}", urlPath, response.getStatus(), content);
+
             try {
                 if (response.getStatus() == HttpStatus.OK_200) {
                     final T result = jsonConverter.apply(content);
@@ -179,10 +192,12 @@ class EnvoyConnector {
                     logger.debug("Envoy returned an error: {}", error);
                     throw new EnvoyConnectionException(error == null ? response.getReason() : error.info);
                 }
+
             } catch (final JsonSyntaxException e) {
                 logger.debug("Error parsing json: {}", content, e);
                 throw new EnvoyConnectionException("Error parsing data: ", e);
             }
+
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new EnvoyConnectionException("Interrupted");
