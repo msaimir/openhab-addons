@@ -158,10 +158,12 @@ public class EnvoyBridgeHandler extends BaseBridgeHandler {
         updataDataFuture = scheduler.scheduleWithFixedDelay(this::updateData, 0, configuration.refresh,
                 TimeUnit.MINUTES);
 
-        logger.debug("Configuration {}", configuration);
-        EnvoyTlsTrustManagerProvider tlsTrustManagerProvider = new EnvoyTlsTrustManagerProvider(configuration.hostname);
-        serviceRegistration = FrameworkUtil.getBundle(getClass()).getBundleContext()
-                .registerService(TlsTrustManagerProvider.class.getName(), tlsTrustManagerProvider, null);
+        if(!configuration.hostname.isBlank()) {
+            logger.debug("Configuration {}", configuration);
+            EnvoyTlsTrustManagerProvider tlsTrustManagerProvider = new EnvoyTlsTrustManagerProvider(configuration.hostname);
+            serviceRegistration = FrameworkUtil.getBundle(getClass()).getBundleContext()
+                    .registerService(TlsTrustManagerProvider.class.getName(), tlsTrustManagerProvider, null);
+        }
     }
 
     /**

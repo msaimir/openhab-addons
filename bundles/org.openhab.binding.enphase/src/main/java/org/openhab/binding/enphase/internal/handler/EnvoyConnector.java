@@ -68,6 +68,8 @@ class EnvoyConnector {
     private final HttpClient httpClient;
     private String hostname = "";
 
+    private String envoyJwtToken = "";
+
     private @Nullable EnvoyConfiguration envoyConfiguration;
 
     private @Nullable DigestAuthentication envoyAuthn;
@@ -85,6 +87,7 @@ class EnvoyConnector {
     public void setConfiguration(final EnvoyConfiguration configuration) {
         logger.debug("Envoy configuration {}", configuration);
         this.envoyConfiguration = configuration;
+        this.envoyJwtToken = configuration.enlightenAuthToken;
         hostname = configuration.hostname;
         if (hostname.isEmpty()) {
             return;
@@ -160,11 +163,6 @@ class EnvoyConnector {
     private synchronized <T> T retrieveData(final String urlPath, final Function<String, @Nullable T> jsonConverter)
             throws EnvoyConnectionException, EnvoyNoHostnameException {
         try {
-            String jwt = null;
-            if(envoyConfiguration != null) {
-                jwt = EnphaseJWTExtractor.fetchJWT(httpClient, envoyConfiguration.enlightenBaseUri, envoyConfiguration.enlightenUsername, envoyConfiguration.enlightenPassword, envoyConfiguration.serialNumber);
-                logger.debug("retrieved jwt {}", jwt);
-            }
             if (hostname.isEmpty()) {
                 throw new EnvoyNoHostnameException("No host name/ip address known (yet)");
             }
@@ -173,9 +171,14 @@ class EnvoyConnector {
             final Request request = httpClient.newRequest(uri)
                     .method(HttpMethod.GET)
                     .timeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            if(jwt != null) {
-                request.header(HttpHeader.AUTHORIZATION, "Bearer: " + jwt);
+
+            if(envoyJwtToken.isBlank() && envoyConfiguration != null) {
+                var webToken = EnphaseJWTExtractor.fetchJWT(httpClient, envoyConfiguration.enlightenBaseUri, envoyConfiguration.enlightenUsername, envoyConfiguration.enlightenPassword, envoyConfiguration.serialNumber);
+                request.header(HttpHeader.AUTHORIZATION, "Bearer: " + webToken.getToken());
+                envoyJwtToken = webToken.getToken();
+
             }
+
             final ContentResponse response = request.send();
             final String content = response.getContentAsString();
 

@@ -45,7 +45,7 @@ public class EnphaseJWTExtractor {
         throw new IllegalStateException("Utility class");
     }
 
-    public static String fetchJWT(HttpClient httpClient, String baseUri, String username, String password, String serialNumber) throws EnvoyConnectionException {
+    public static WebToken fetchJWT(HttpClient httpClient, String baseUri, String username, String password, String serialNumber) throws EnvoyConnectionException {
         try {
             logger.trace("Fetching Enlighten Login Page");
             Document loginPage = getLoginPage(httpClient, baseUri);
@@ -80,7 +80,7 @@ public class EnphaseJWTExtractor {
         return new FormContentProvider(fields);
     }
 
-    private static String scanForToken(HttpClient httpClient, String baseUri, String serialNumber) throws ExecutionException, InterruptedException, TimeoutException, JsonProcessingException, EnvoyConnectionException {
+    private static WebToken scanForToken(HttpClient httpClient, String baseUri, String serialNumber) throws ExecutionException, InterruptedException, TimeoutException, JsonProcessingException, EnvoyConnectionException {
         var response = httpClient.newRequest(baseUri + "/entrez-auth-token?serial_num=" + serialNumber).send();
         Document jwt = Jsoup.parse(response.getContentAsString(), baseUri);
         String tokenObject = jwt.getElementsByTag("body").text();
@@ -89,7 +89,7 @@ public class EnphaseJWTExtractor {
             throw new EnvoyConnectionException("Failed to fetch the token page");
         }
         ObjectMapper jsonMapper = new ObjectMapper();
-        return jsonMapper.readValue(tokenObject, WebToken.class).getToken();
+        return jsonMapper.readValue(tokenObject, WebToken.class);
     }
 
     private static Document getLoginPage(HttpClient httpClient, String url) throws ExecutionException, InterruptedException, TimeoutException {

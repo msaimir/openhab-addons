@@ -50,6 +50,11 @@
 				<default>5</default>
 				<advanced>true</advanced>
 			</parameter>
+			<parameter name="enlightenAuthToken" type="text">
+				<label>Enlighten Authorization Token</label>
+				<description>Token from https://enlighten.enphaseenergy.com/entrez-auth-token?serial_num=</description>
+				<advanced>true</advanced>
+			</parameter>
 			<parameter name="enlightenBaseUri" type="text">
 				<label>Enlighten Base URI</label>
 				<description>URI of the enlighten web application where authentication will happen</description>

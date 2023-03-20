@@ -35,6 +35,7 @@ public class EnvoyConfiguration {
     public String password = "";
     public int refresh = DEFAULT_REFRESH_MINUTES;
 
+    public String enlightenAuthToken = "";
     public String enlightenBaseUri = DEFAULT_ENLIGHTEN_BASEURI;
     public String enlightenUsername = "";
     public String enlightenPassword = "";
@@ -47,6 +48,7 @@ public class EnvoyConfiguration {
                 ", username='" + username + '\'' +
                 ", password='" + StringUtils.repeat("*",password.length()) + '\'' +
                 ", refresh=" + refresh +
+                ", enlightenAuthToken='" + enlightenAuthToken + '\'' +
                 ", enlightenBaseUri='" + enlightenBaseUri + '\'' +
                 ", enlightenUsername='" + enlightenUsername + '\'' +
                 ", enlightenPassword='" + StringUtils.repeat("*", enlightenPassword.length()) + '\'' +
