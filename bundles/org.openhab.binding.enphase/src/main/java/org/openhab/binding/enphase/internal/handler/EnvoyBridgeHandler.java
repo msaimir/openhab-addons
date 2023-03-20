@@ -15,7 +15,11 @@ package org.openhab.binding.enphase.internal.handler;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
-import org.openhab.binding.enphase.internal.*;
+import org.openhab.binding.enphase.internal.EnphaseBindingConstants;
+import org.openhab.binding.enphase.internal.EnvoyConfiguration;
+import org.openhab.binding.enphase.internal.EnvoyConnectionException;
+import org.openhab.binding.enphase.internal.EnvoyHostAddressCache;
+import org.openhab.binding.enphase.internal.EnvoyNoHostnameException;
 import org.openhab.binding.enphase.internal.discovery.EnphaseDevicesDiscoveryService;
 import org.openhab.binding.enphase.internal.dto.EnvoyEnergyDTO;
 import org.openhab.binding.enphase.internal.dto.InventoryJsonDTO.DeviceDTO;
@@ -25,7 +29,12 @@ import org.openhab.core.config.core.Configuration;
 import org.openhab.core.io.net.http.TlsTrustManagerProvider;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.library.unit.Units;
-import org.openhab.core.thing.*;
+import org.openhab.core.thing.Bridge;
+import org.openhab.core.thing.Channel;
+import org.openhab.core.thing.ChannelUID;
+import org.openhab.core.thing.Thing;
+import org.openhab.core.thing.ThingStatus;
+import org.openhab.core.thing.ThingStatusDetail;
 import org.openhab.core.thing.binding.BaseBridgeHandler;
 import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerService;
@@ -48,7 +57,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.*;
+import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.CONFIG_HOSTNAME;
+import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.ENVOY_CHANNELGROUP_CONSUMPTION;
+import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.ENVOY_WATTS_NOW;
+import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.ENVOY_WATT_HOURS_LIFETIME;
+import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.ENVOY_WATT_HOURS_SEVEN_DAYS;
+import static org.openhab.binding.enphase.internal.EnphaseBindingConstants.ENVOY_WATT_HOURS_TODAY;
 
 /**
  * BridgeHandler for the Envoy gateway.

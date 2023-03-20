@@ -31,7 +31,11 @@ import org.openhab.binding.enphase.internal.EnphaseBindingConstants;
 import org.openhab.binding.enphase.internal.EnvoyConfiguration;
 import org.openhab.binding.enphase.internal.EnvoyConnectionException;
 import org.openhab.binding.enphase.internal.EnvoyNoHostnameException;
-import org.openhab.binding.enphase.internal.dto.*;
+import org.openhab.binding.enphase.internal.dto.EnvoyEnergyDTO;
+import org.openhab.binding.enphase.internal.dto.EnvoyErrorDTO;
+import org.openhab.binding.enphase.internal.dto.InventoryJsonDTO;
+import org.openhab.binding.enphase.internal.dto.InverterDTO;
+import org.openhab.binding.enphase.internal.dto.ProductionJsonDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,8 +62,6 @@ class EnvoyConnector {
     private static final String CONSUMPTION_URL = "/api/v1/consumption";
     private static final String INVERTERS_URL = PRODUCTION_URL + "/inverters";
     private static final long CONNECT_TIMEOUT_SECONDS = 5;
-
-//    private static final String CHECK_JWT = "/auth/check_jwt";
 
     private final Logger logger = LoggerFactory.getLogger(EnvoyConnector.class);
     private final Gson gson = new GsonBuilder().create();
@@ -160,8 +162,8 @@ class EnvoyConnector {
         try {
             String jwt = null;
             if(envoyConfiguration != null) {
-                jwt = EnphaseJWTExtractor.fetchJWT(httpClient, envoyConfiguration.username, envoyConfiguration.password, envoyConfiguration.serialNumber);
-                logger.debug("jwt retrieved {}", jwt);
+                jwt = EnphaseJWTExtractor.fetchJWT(httpClient, envoyConfiguration.enlightenBaseUri, envoyConfiguration.enlightenUsername, envoyConfiguration.enlightenPassword, envoyConfiguration.serialNumber);
+                logger.debug("retrieved jwt {}", jwt);
             }
             if (hostname.isEmpty()) {
                 throw new EnvoyNoHostnameException("No host name/ip address known (yet)");

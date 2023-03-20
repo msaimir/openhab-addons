@@ -30,24 +30,41 @@
 			<parameter name="hostname" type="text">
 				<label>Host Name / IP Address</label>
 				<description>The host name/ip address of the Envoy gateway. Leave empty to auto detect</description>
-				<advanced>true</advanced>
+				<advanced>false</advanced>
 			</parameter>
 			<parameter name="username" type="text">
 				<label>User Name</label>
 				<description>The user name to the Envoy gateway. Leave empty when using the default user name</description>
 				<default>envoy</default>
-				<advanced>true</advanced>
+				<advanced>false</advanced>
 			</parameter>
 			<parameter name="password" type="text">
 				<context>password</context>
 				<label>Password</label>
 				<description>The password to the Envoy gateway. Leave empty when using the default password</description>
-				<advanced>true</advanced>
+				<advanced>false</advanced>
 			</parameter>
 			<parameter name="refresh" type="integer" unit="min">
 				<label>Refresh Time</label>
 				<description>Period between updates. The default is 5 minutes, the refresh frequency of the Envoy itself</description>
 				<default>5</default>
+				<advanced>true</advanced>
+			</parameter>
+			<parameter name="enlightenBaseUri" type="text">
+				<label>Enlighten Base URI</label>
+				<description>URI of the enlighten web application where authentication will happen</description>
+				<default>https://enlighten.enphaseenergy.com</default>
+				<advanced>true</advanced>
+			</parameter>
+			<parameter name="enlightenUsername" type="text">
+				<label>Enlighten User Name</label>
+				<description>The username to authenticate on enlighten web application</description>
+				<advanced>true</advanced>
+			</parameter>
+			<parameter name="enlightenPassword" type="text">
+				<context>password</context>
+				<label>Enlighten Password</label>
+				<description>The password</description>
 				<advanced>true</advanced>
 			</parameter>
 		</config-description>

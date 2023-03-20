@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2023 Contributors to the openHAB project
+ * Copyright (c) 2010-2022 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -16,6 +16,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.util.FormContentProvider;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpMethod;
@@ -39,10 +40,25 @@ import java.util.concurrent.TimeoutException;
 public class EnphaseJWTExtractor {
 
     private final static Logger logger = LoggerFactory.getLogger(EnphaseJWTExtractor.class);
-    private static final String ENPHASE_BASE_URI = "https://enlighten.enphaseenergy.com";
 
     private EnphaseJWTExtractor() {
         throw new IllegalStateException("Utility class");
+    }
+
+    public static String fetchJWT(HttpClient httpClient, String baseUri, String username, String password, String serialNumber) throws EnvoyConnectionException {
+        try {
+            logger.trace("Fetching Enlighten Login Page");
+            Document loginPage = getLoginPage(httpClient, baseUri);
+            logger.trace("Attempting to Login with a Form Submit");
+            postForm(httpClient, baseUri, encodeFormData(loginPage, username, password));
+            logger.trace("Fetching and Scanning returned HTML for Token");
+            return scanForToken(httpClient, baseUri, serialNumber);
+        } catch (ExecutionException | TimeoutException | JsonProcessingException e) {
+            throw new EnvoyConnectionException("Error retrieving jwt token from enphase", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new EnvoyConnectionException("Interrupt error retrieving jwt token from enphase", e);
+        }
     }
 
     private static String findInputValue(List<Element> inputElements, String name) {
@@ -53,14 +69,7 @@ public class EnphaseJWTExtractor {
                 .orElse("");
     }
 
-    public static Document getLoginPage(HttpClient httpClient) throws ExecutionException, InterruptedException, TimeoutException {
-        var request = httpClient.newRequest(ENPHASE_BASE_URI);
-        request.header(HttpHeader.ACCEPT, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
-        var response = request.send();
-        return Jsoup.parse(response.getContentAsString(), ENPHASE_BASE_URI);
-    }
-
-    public static FormContentProvider encodeFormData(Document document, String username, String password) {
+    private static FormContentProvider encodeFormData(Document document, String username, String password) {
         List<Element> inputElements = document.getElementsByTag("input");
         Fields fields = new Fields();
         fields.put("utf8", findInputValue(inputElements, "utf8"));
@@ -71,37 +80,36 @@ public class EnphaseJWTExtractor {
         return new FormContentProvider(fields);
     }
 
-    public static void postForm(HttpClient httpClient, FormContentProvider formContentProvider) throws ExecutionException, InterruptedException, TimeoutException {
-        var response = httpClient.newRequest(ENPHASE_BASE_URI + "/login/login").method(HttpMethod.POST)
-                .header(HttpHeader.ORIGIN, ENPHASE_BASE_URI)
-                .header(HttpHeader.CONTENT_TYPE, "application/x-www-form-urlencoded")
-                .content(formContentProvider).send();
-    }
-
-    public static String scanForToken(HttpClient httpClient, String serialNumber) throws ExecutionException, InterruptedException, TimeoutException, EnvoyConnectionException, JsonProcessingException {
-        var response = httpClient.newRequest(ENPHASE_BASE_URI + "/entrez-auth-token?serial_num=" + serialNumber).send();
-        Document jwt = Jsoup.parse(response.getContentAsString(), ENPHASE_BASE_URI);
+    private static String scanForToken(HttpClient httpClient, String baseUri, String serialNumber) throws ExecutionException, InterruptedException, TimeoutException, JsonProcessingException, EnvoyConnectionException {
+        var response = httpClient.newRequest(baseUri + "/entrez-auth-token?serial_num=" + serialNumber).send();
+        Document jwt = Jsoup.parse(response.getContentAsString(), baseUri);
         String tokenObject = jwt.getElementsByTag("body").text();
         if (tokenObject.isEmpty()) {
             logger.error("Scan for token failed.  HTML fetched = {}", response.getContentAsString());
             throw new EnvoyConnectionException("Failed to fetch the token page");
         }
-
         ObjectMapper jsonMapper = new ObjectMapper();
         return jsonMapper.readValue(tokenObject, WebToken.class).getToken();
     }
 
-    public static String fetchJWT(HttpClient httpClient, String username, String password, String serialNumber) throws EnvoyConnectionException {
+    private static Document getLoginPage(HttpClient httpClient, String url) throws ExecutionException, InterruptedException, TimeoutException {
+        var request = httpClient.newRequest(url);
+        request.header(HttpHeader.ACCEPT, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
+        var response = request.send();
+        return Jsoup.parse(response.getContentAsString(), url);
+    }
 
-        try {
-            logger.debug("Fetching Enlighten Login Page");
-            Document loginPage = getLoginPage(httpClient);
-            logger.debug("Attempting to Login with a Form Submit");
-            postForm(httpClient, encodeFormData(loginPage, username, password));
-            logger.debug("Fetching and Scanning returned HTML for Token");
-            return scanForToken(httpClient, serialNumber);
-        } catch (ExecutionException | InterruptedException | TimeoutException | JsonProcessingException e) {
-            throw new EnvoyConnectionException("error retrieving jwt token from enphase", e);
+    private static void postForm(HttpClient httpClient, String baseUri, FormContentProvider formContentProvider) throws EnvoyConnectionException, ExecutionException, InterruptedException, TimeoutException {
+        ContentResponse response;
+
+        response = httpClient.newRequest(baseUri + "/login/login").method(HttpMethod.POST)
+                .header(HttpHeader.ORIGIN, baseUri)
+                .header(HttpHeader.CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .content(formContentProvider)
+                .send();
+
+        if (response.getStatus() != 200) {
+            throw new EnvoyConnectionException("Could not authenticate to enlighten envoy web application");
         }
     }
 }

@@ -12,12 +12,14 @@
  */
 package org.openhab.binding.enphase.internal;
 
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
  * The {@link EnvoyConfiguration} class contains fields mapping thing configuration parameters.
  *
  * @author Hilbrand Bouwkamp - Initial contribution
+ * @author Saimir Muco - Add attributes to authenticate on enlighten envoy web application
  */
 @NonNullByDefault
 public class EnvoyConfiguration {
@@ -25,15 +27,29 @@ public class EnvoyConfiguration {
     public static final String DEFAULT_USERNAME = "envoy";
     private static final int DEFAULT_REFRESH_MINUTES = 5;
 
+    private static final String DEFAULT_ENLIGHTEN_BASEURI = "https://enlighten.enphaseenergy.com";
+
     public String serialNumber = "";
     public String hostname = "";
     public String username = DEFAULT_USERNAME;
     public String password = "";
     public int refresh = DEFAULT_REFRESH_MINUTES;
 
+    public String enlightenBaseUri = DEFAULT_ENLIGHTEN_BASEURI;
+    public String enlightenUsername = "";
+    public String enlightenPassword = "";
+
     @Override
     public String toString() {
-        return "EnvoyConfiguration [serialNumber=" + serialNumber + ", hostname=" + hostname + ", username=" + username
-                + ", password=" + password + ", refresh=" + refresh + "]";
+        return "EnvoyConfiguration{" +
+                "serialNumber='" + serialNumber + '\'' +
+                ", hostname='" + hostname + '\'' +
+                ", username='" + username + '\'' +
+                ", password='" + StringUtils.repeat("*",password.length()) + '\'' +
+                ", refresh=" + refresh +
+                ", enlightenBaseUri='" + enlightenBaseUri + '\'' +
+                ", enlightenUsername='" + enlightenUsername + '\'' +
+                ", enlightenPassword='" + StringUtils.repeat("*", enlightenPassword.length()) + '\'' +
+                '}';
     }
 }

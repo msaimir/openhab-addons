@@ -11,7 +11,6 @@
   </parent>
 
   <artifactId>org.openhab.binding.enphase</artifactId>
-
   <name>openHAB Add-ons :: Bundles :: Enphase Binding</name>
 
   <dependencies>
